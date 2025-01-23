@@ -105,6 +105,17 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
         .await
     }
 
+    /// Listen for commands as a slave with address `address`
+    async fn listen<
+        W: Fn(A, &[u8]) -> impl core::future::Future<Output = ()>,
+        R: Fn(A, &mut [u8]),
+    >(
+        &mut self,
+        address: A,
+        write: W,
+        read: R,
+    ) -> Result<(), Self::Error>;
+
     /// Execute the provided operations on the I2C bus as a single transaction.
     ///
     /// Transaction contract:

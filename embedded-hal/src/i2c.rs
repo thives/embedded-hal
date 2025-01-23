@@ -387,6 +387,14 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
         )
     }
 
+    /// Listen for commands as a slave with address `address`
+    fn listen<W: Fn(A, &[u8]), R: Fn(A, &mut [u8])>(
+        &mut self,
+        address: A,
+        write: W,
+        read: R,
+    ) -> Result<(), Self::Error>;
+
     /// Execute the provided operations on the I2C bus.
     ///
     /// Transaction contract:
@@ -421,6 +429,16 @@ impl<A: AddressMode, T: I2c<A> + ?Sized> I2c<A> for &mut T {
     #[inline]
     fn write_read(&mut self, address: A, write: &[u8], read: &mut [u8]) -> Result<(), Self::Error> {
         T::write_read(self, address, write, read)
+    }
+
+    #[inline]
+    fn listen<W: Fn(A, &[u8]), R: Fn(A, &mut [u8])>(
+        &mut self,
+        address: A,
+        write: W,
+        read: R,
+    ) -> Result<(), Self::Error> {
+        T::listen(self, address, write, read)
     }
 
     #[inline]
