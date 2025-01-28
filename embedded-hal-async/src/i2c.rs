@@ -16,12 +16,13 @@
 //! Since 7-bit addressing is the mode of the majority of I2C devices,
 //! `SevenBitAddress` has been set as default mode and thus can be omitted if desired.
 
+use core::ops::AsyncFn;
 pub use embedded_hal::i2c::{
     AddressMode, Error, ErrorKind, ErrorType, NoAcknowledgeSource, Operation, SevenBitAddress,
     TenBitAddress,
 };
 
-/// Async I2c.
+/// Async I2c master.
 pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
     /// Reads enough bytes from slave with `address` to fill `buffer`.
     ///
@@ -105,17 +106,6 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
         .await
     }
 
-    /// Listen for commands as a slave with address `address`
-    async fn listen<
-        W: Fn(A, &[u8]) -> impl core::future::Future<Output = ()>,
-        R: Fn(A, &mut [u8]),
-    >(
-        &mut self,
-        address: A,
-        write: W,
-        read: R,
-    ) -> Result<(), Self::Error>;
-
     /// Execute the provided operations on the I2C bus as a single transaction.
     ///
     /// Transaction contract:
@@ -133,6 +123,20 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
         &mut self,
         address: A,
         operations: &mut [Operation<'_>],
+    ) -> Result<(), Self::Error>;
+}
+
+/// Async I2c slave.
+pub trait I2cSlave<A: AddressMode = SevenBitAddress>: ErrorType {
+    /// Listen for commands as a slave with address `address`
+    async fn listen<
+        W: AsyncFn(A, &[u8]) -> Result<(), Self::Error>,
+        R: AsyncFn(A, &mut [u8]) -> Result<(), Self::Error>,
+    >(
+        &mut self,
+        address: A,
+        write: W,
+        read: R,
     ) -> Result<(), Self::Error>;
 }
 
@@ -164,5 +168,20 @@ impl<A: AddressMode, T: I2c<A> + ?Sized> I2c<A> for &mut T {
         operations: &mut [Operation<'_>],
     ) -> Result<(), Self::Error> {
         T::transaction(self, address, operations).await
+    }
+}
+
+impl<A: AddressMode, T: I2cSlave<A> + ?Sized> I2cSlave<A> for &mut T {
+    #[inline]
+    async fn listen<
+        W: AsyncFn(A, &[u8]) -> Result<(), Self::Error>,
+        R: AsyncFn(A, &mut [u8]) -> Result<(), Self::Error>,
+    >(
+        &mut self,
+        address: A,
+        write: W,
+        read: R,
+    ) -> Result<(), Self::Error> {
+        T::listen(self, address, write, read).await
     }
 }

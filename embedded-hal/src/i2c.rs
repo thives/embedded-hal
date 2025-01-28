@@ -311,7 +311,7 @@ pub enum Operation<'a> {
     Write(&'a [u8]),
 }
 
-/// Blocking I2C.
+/// Blocking I2C master.
 pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
     /// Reads enough bytes from slave with `address` to fill `read`.
     ///
@@ -387,14 +387,6 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
         )
     }
 
-    /// Listen for commands as a slave with address `address`
-    fn listen<W: Fn(A, &[u8]), R: Fn(A, &mut [u8])>(
-        &mut self,
-        address: A,
-        write: W,
-        read: R,
-    ) -> Result<(), Self::Error>;
-
     /// Execute the provided operations on the I2C bus.
     ///
     /// Transaction contract:
@@ -415,6 +407,17 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
     ) -> Result<(), Self::Error>;
 }
 
+/// Blocking I2C slave.
+pub trait I2cSlave<A: AddressMode = SevenBitAddress>: ErrorType {
+    /// Listen for commands as a slave with address `address`
+    fn listen<W: Fn(A, &[u8]), R: Fn(A, &mut [u8])>(
+        &mut self,
+        address: A,
+        write: W,
+        read: R,
+    ) -> Result<(), Self::Error>;
+}
+
 impl<A: AddressMode, T: I2c<A> + ?Sized> I2c<A> for &mut T {
     #[inline]
     fn read(&mut self, address: A, read: &mut [u8]) -> Result<(), Self::Error> {
@@ -432,6 +435,17 @@ impl<A: AddressMode, T: I2c<A> + ?Sized> I2c<A> for &mut T {
     }
 
     #[inline]
+    fn transaction(
+        &mut self,
+        address: A,
+        operations: &mut [Operation<'_>],
+    ) -> Result<(), Self::Error> {
+        T::transaction(self, address, operations)
+    }
+}
+
+impl<A: AddressMode, T: I2cSlave<A> + ?Sized> I2cSlave<A> for &mut T {
+    #[inline]
     fn listen<W: Fn(A, &[u8]), R: Fn(A, &mut [u8])>(
         &mut self,
         address: A,
@@ -439,14 +453,5 @@ impl<A: AddressMode, T: I2c<A> + ?Sized> I2c<A> for &mut T {
         read: R,
     ) -> Result<(), Self::Error> {
         T::listen(self, address, write, read)
-    }
-
-    #[inline]
-    fn transaction(
-        &mut self,
-        address: A,
-        operations: &mut [Operation<'_>],
-    ) -> Result<(), Self::Error> {
-        T::transaction(self, address, operations)
     }
 }
