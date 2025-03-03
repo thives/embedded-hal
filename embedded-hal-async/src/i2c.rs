@@ -16,7 +16,7 @@
 //! Since 7-bit addressing is the mode of the majority of I2C devices,
 //! `SevenBitAddress` has been set as default mode and thus can be omitted if desired.
 
-use core::ops::AsyncFn;
+use core::ops::AsyncFnMut;
 pub use embedded_hal::i2c::{
     AddressMode, Error, ErrorKind, ErrorType, NoAcknowledgeSource, Operation, SevenBitAddress,
     TenBitAddress,
@@ -130,13 +130,11 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
 pub trait I2cSlave<A: AddressMode = SevenBitAddress>: ErrorType {
     /// Listen for commands as a slave with address `address`
     async fn listen<
-        W: AsyncFn(A, &[u8]) -> Result<(), Self::Error>,
-        R: AsyncFn(A, &mut [u8]) -> Result<(), Self::Error>,
+        D: AsyncFnMut(A, &[u8]) -> [u8],
     >(
         &mut self,
         address: A,
-        write: W,
-        read: R,
+        on_data: D,
     ) -> Result<(), Self::Error>;
 }
 
@@ -174,14 +172,12 @@ impl<A: AddressMode, T: I2c<A> + ?Sized> I2c<A> for &mut T {
 impl<A: AddressMode, T: I2cSlave<A> + ?Sized> I2cSlave<A> for &mut T {
     #[inline]
     async fn listen<
-        W: AsyncFn(A, &[u8]) -> Result<(), Self::Error>,
-        R: AsyncFn(A, &mut [u8]) -> Result<(), Self::Error>,
+        D: AsyncFnMut(A, &[u8]) -> [u8],
     >(
         &mut self,
         address: A,
-        write: W,
-        read: R,
+        on_data: D,
     ) -> Result<(), Self::Error> {
-        T::listen(self, address, write, read).await
+        T::listen(self, address, on_data).await
     }
 }

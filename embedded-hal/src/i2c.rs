@@ -407,14 +407,13 @@ pub trait I2c<A: AddressMode = SevenBitAddress>: ErrorType {
     ) -> Result<(), Self::Error>;
 }
 
-/// Blocking I2C slave.
-pub trait I2cSlave<A: AddressMode = SevenBitAddress>: ErrorType {
-    /// Listen for commands as a slave with address `address`
-    fn listen<W: Fn(A, &[u8]), R: Fn(A, &mut [u8])>(
+/// Blocking I2C target.
+pub trait I2cTarget<A: AddressMode = SevenBitAddress>: ErrorType {
+    /// Listen for commands as a target with address `address`
+    fn listen<D: FnMut(A, &mut [u8]) -> [u8]>(
         &mut self,
         address: A,
-        write: W,
-        read: R,
+        on_data: D,
     ) -> Result<(), Self::Error>;
 }
 
@@ -444,14 +443,13 @@ impl<A: AddressMode, T: I2c<A> + ?Sized> I2c<A> for &mut T {
     }
 }
 
-impl<A: AddressMode, T: I2cSlave<A> + ?Sized> I2cSlave<A> for &mut T {
+impl<A: AddressMode, T: I2cTarget<A> + ?Sized> I2cTarget<A> for &mut T {
     #[inline]
-    fn listen<W: Fn(A, &[u8]), R: Fn(A, &mut [u8])>(
+    fn listen<D: FnMut(A, &mut [u8]) -> [u8]>(
         &mut self,
         address: A,
-        write: W,
-        read: R,
+        on_data: D,
     ) -> Result<(), Self::Error> {
-        T::listen(self, address, write, read)
+        T::listen(self, address, on_data)
     }
 }
